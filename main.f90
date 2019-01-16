@@ -403,7 +403,13 @@ program main
 			write(*,*) 'Iteration number', is
 		end if		
 
-		do iw = nstart(myid),nfinish(myid)		
+		do iw = nstart(myid),nfinish(myid)	
+		
+		    do j = 1, Nsites
+		        n_up(j) = nn(j+Nsites)    
+		        n_down(j) = nn(j)
+            end do
+		       	
 			Gdummy(:,:) = (w(iw) + ii*eta)*IdMat(:,:) - H(:,:)- sigma(:,:)	
 		
 			!	Matrix Inversion
@@ -453,13 +459,179 @@ program main
 		end if
 
     	call MPI_BCAST(nn(1),2*Nsites,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
+    	
+    	do j = 1, Nsites
+    	    n_up(j) = nn(j+Nsites)
+    	    n_down(j) = nn(j)
+	    end do
+    	
+    	Vm(:,:) = 0.d0
+        counter = 0
+        do l=0,N1D-1
+        do m=0,N1D-1
+        do n=0,N1D-1
+	        ind(l,m,n) = counter + 1
+	        i = ind(l,m,n)
+	        
+            ! ========================= Sudut ======================== !
+	        if (l == 0 .and. m == 0 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V
+            elseif (l == 0 .and. m == 0 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V      
+            elseif (l == 0 .and. m == N1D-1 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V        
+            elseif (l == 0 .and. m == N1D-1 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V	
+            elseif (l == N1D-1 .and. m == 0 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V
+            elseif (l == N1D-1 .and. m == 0 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V	
+            elseif (l == N1D-1 .and. m == N1D-1 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V	
+            elseif (l == N1D-1 .and. m == N1D-1 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            ! ======================================================== !
+            
+            ! ========================= Rusuk ======================== !
+            elseif (l == 0     .and. m == 0    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif (l == 0     .and. m == N1D-1    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif (l == N1D-1     .and. m == 0    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif (l == N1D-1     .and. m == N1D-1    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V     
+            elseif (l == 0     .and. (m > 0) .and. (m < N1D-1)   .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V
+            elseif (l == 0     .and. (m > 0) .and. (m < N1D-1)   .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+            elseif (l == N1D-1     .and. (m > 0) .and. (m < N1D-1)   .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V                
+            elseif (l == N1D-1     .and. (m > 0) .and. (m < N1D-1)   .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == 0 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V                
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == 0 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == N1D-1 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V                 
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == N1D-1 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            ! ======================================================== !
+            
+            ! ========================= Sisi ========================= !
+            elseif (l == 0 .and. (m > 0) .and. (m < N1D-1) .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                                
+            elseif (l == N1D-1 .and. (m > 0) .and. (m < N1D-1) .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == 0 .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == N1D-1 .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+             elseif ((l > 0) .and. (l < N1D-1) .and. (m > 0) .and. (m < N1D-1) .and. n == 0) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &   
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V               
+             elseif ((l > 0) .and. (l < N1D-1) .and. (m > 0) .and. (m < N1D-1) .and. n == N1D-1) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            ! ======================================================== !
+            
+            ! ========================= Tengah ========================= !                        
+	        else
+	            Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &   
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            end if
+            counter = counter + 1
+        end do
+        end do
+        end do                
+        
+        Vm(Nsites+1:2*Nsites,Nsites+1:2*Nsites) = Vm(1:Nsites,1:Nsites)
 
 		sigmac(:,:) = 0.d0
 		parterrorsigma = 0.d0
 !		do iw = nstart(myid), nfinish(myid)
 		do j = 1, Nsites
-			sigmac(j,j) = nn(j+Nsites)*U
-			sigmac(j+Nsites,j+Nsites) = nn(j)*U
+			sigmac(j,j) = nn(j+Nsites)*U + Vm(j,j)
+			sigmac(j+Nsites,j+Nsites) = nn(j)*U + Vm(j+Nsites,j+Nsites)
 		end do
 
 			! Error check
@@ -485,7 +657,7 @@ program main
 					write(13,*)w(iw), DOSdown(iw)
 				end do
 					do j = 1,Nsites
-					write(15,*)j,(sigma(j+Nsites,j+Nsites)-Vm(j+Nsites,j+Nsites))/U,(sigma(j,j)-Vm(j,j))/U
+					write(15,*)j, Vm(j+Nsites,j+Nsites),Vm(j,j)
 		 		end do
 				write(14,*)mu,0.D0
 				write(14,*)mu,Nsites	
@@ -516,11 +688,178 @@ program main
     call MPI_Barrier(MPI_COMM_WORLD,ierr)
 
 	! 	Reconstructing the Green Function using the already converged <n(j)> by all processors
-	do iw = 1, Nw		
+	do iw = 1, Nw
+	    
+    	do j = 1, Nsites
+    	    n_up(j) = nn(j+Nsites)
+    	    n_down(j) = nn(j)
+	    end do
+    	
+    	Vm(:,:) = 0.d0
+        counter = 0
+        do l=0,N1D-1
+        do m=0,N1D-1
+        do n=0,N1D-1
+	        ind(l,m,n) = counter + 1
+	        i = ind(l,m,n)
+	        
+            ! ========================= Sudut ======================== !
+	        if (l == 0 .and. m == 0 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V
+            elseif (l == 0 .and. m == 0 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V      
+            elseif (l == 0 .and. m == N1D-1 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V        
+            elseif (l == 0 .and. m == N1D-1 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V	
+            elseif (l == N1D-1 .and. m == 0 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V
+            elseif (l == N1D-1 .and. m == 0 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V	
+            elseif (l == N1D-1 .and. m == N1D-1 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V	
+            elseif (l == N1D-1 .and. m == N1D-1 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                     &   + n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                     &   + n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            ! ======================================================== !
+            
+            ! ========================= Rusuk ======================== !
+            elseif (l == 0     .and. m == 0    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif (l == 0     .and. m == N1D-1    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif (l == N1D-1     .and. m == 0    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif (l == N1D-1     .and. m == N1D-1    .and. (n > 0) .and. (n < N1D-1)) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V     
+            elseif (l == 0     .and. (m > 0) .and. (m < N1D-1)   .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V
+            elseif (l == 0     .and. (m > 0) .and. (m < N1D-1)   .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+            elseif (l == N1D-1     .and. (m > 0) .and. (m < N1D-1)   .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V                
+            elseif (l == N1D-1     .and. (m > 0) .and. (m < N1D-1)   .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == 0 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V                
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == 0 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == N1D-1 .and. n == 0) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V                 
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == N1D-1 .and. n == N1D-1) then
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            ! ======================================================== !
+            
+            ! ========================= Sisi ========================= !
+            elseif (l == 0 .and. (m > 0) .and. (m < N1D-1) .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                                
+            elseif (l == N1D-1 .and. (m > 0) .and. (m < N1D-1) .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == 0 .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+            elseif ((l > 0) .and. (l < N1D-1) .and. m == N1D-1 .and. (n > 0) .and. (n < N1D-1)) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V                
+             elseif ((l > 0) .and. (l < N1D-1) .and. (m > 0) .and. (m < N1D-1) .and. n == 0) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &   
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)))*V               
+             elseif ((l > 0) .and. (l < N1D-1) .and. (m > 0) .and. (m < N1D-1) .and. n == N1D-1) then                        
+                Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &   
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            ! ======================================================== !
+            
+            ! ========================= Tengah ========================= !                        
+	        else
+	            Vm(i,i) = (n_up(ind(l+1,m,n)) + n_down(ind(l+1,m,n)) &
+                    &   +  n_up(ind(l-1,m,n)) + n_down(ind(l-1,m,n)) &
+                    &   +  n_up(ind(l,m+1,n)) + n_down(ind(l,m+1,n)) &
+                    &   +  n_up(ind(l,m-1,n)) + n_down(ind(l,m-1,n)) &   
+                    &   +  n_up(ind(l,m,n+1)) + n_down(ind(l,m,n+1)) &
+                    &   +  n_up(ind(l,m,n-1)) + n_down(ind(l,m,n-1)))*V
+            end if
+            counter = counter + 1
+        end do
+        end do
+        end do                
+        
+        Vm(Nsites+1:2*Nsites,Nsites+1:2*Nsites) = Vm(1:Nsites,1:Nsites)
+	
 		sigmaf(:,:) = 0.d0
 		do j = 1,Nsites
-			sigmaf(j,j) = nn(j+Nsites)*U + Vm(j+Nsites,j+Nsites)
-			sigmaf(j+Nsites,j+Nsites) = nn(j)*U + Vm(j,j)
+			sigmaf(j,j) = nn(j+Nsites)*U + Vm(j,j)
+			sigmaf(j+Nsites,j+Nsites) = nn(j)*U + Vm(j+Nsites,j+Nsites)
 		end do
 
 		Gdummy(:,:) = (w(iw)+ii*eta)*IdMat(:,:) - H(:,:) - sigmaf(:,:)	
